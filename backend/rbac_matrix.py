@@ -289,10 +289,15 @@ DEFAULT_PERMISSIONS = {
         # `appointments` — JANJI TEMU dari survei yang sama — tidak menyebut finance sama
         # sekali. Akibatnya `GET /api/appointments?lead_id=…` menjawab 403 untuk peran yang
         # justru punya `leads:view_all`, dan tab "Survey" di profil lead menjadi jebakan.
-        # Sengaja HANYA baca: yang menjadwalkan survei tetap sales/marketing (pemisahan
-        # tugas), jadi tidak ada `create`/`update` di sini.
         "finance": ["view_all"],
         "finance_manager": ["view_all"],
+        # Fase 63 — agenda tidak lagi hanya "janji temu jual": rapat internal, kunjungan
+        # proyek, dan rapat vendor juga hidup di sini, jadi peran proyek & keuangan HARUS
+        # bisa membuat agendanya sendiri. Pemisahan tugas tetap dijaga di router:
+        # agenda yang MENYEBUT LEAD hanya boleh dibuat pemakai yang berhak melihat lead
+        # (`leads:view`), sehingga menjadwalkan survei pembeli tetap milik sales/marketing.
+        "project_manager": ["view_all", "create", "update"],
+        "site_engineer": ["view_all", "create", "update"],
     },
     # Phase 14 — EPIC 1.2 Survey (kunjungan lokasi/unit): terikat lead + appointment
     "surveys": {

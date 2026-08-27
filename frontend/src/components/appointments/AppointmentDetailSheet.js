@@ -57,7 +57,11 @@ export default function AppointmentDetailSheet({ appointment, open, onOpenChange
           <>
             <SheetHeader>
               <SheetTitle className="font-heading">{appointment.title}</SheetTitle>
-              <SheetDescription>Janji temu & survey untuk {appointment.lead_name || "lead"}.</SheetDescription>
+              <SheetDescription>
+                {appointment.lead_id
+                  ? `Janji temu & survey untuk ${appointment.lead_name || "lead"}.`
+                  : "Agenda internal (tanpa lead) — rapat, kunjungan proyek, atau rapat vendor."}
+              </SheetDescription>
             </SheetHeader>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -89,10 +93,21 @@ export default function AppointmentDetailSheet({ appointment, open, onOpenChange
                 disabled={busy || status === appointment.status}>Terapkan</Button>
             </div>
 
-            {/* Survey */}
-            <div className="mt-5">
-              <SurveyPanel appointment={appointment} onChanged={onChanged} />
-            </div>
+            {/* Survey — hanya untuk agenda yang MENYEBUT LEAD. Agenda internal (rapat,
+                kunjungan proyek) tidak punya pembeli yang disurvei, jadi menawarkan
+                "Mulai Survey" di sana hanya menjebak pemakai. */}
+            {appointment.lead_id ? (
+              <div className="mt-5">
+                <SurveyPanel appointment={appointment} onChanged={onChanged} />
+              </div>
+            ) : (
+              <div className="mt-5 space-y-1 rounded-xl border bg-secondary/40 p-3 text-[12px]">
+                <p className="font-medium">Peserta</p>
+                <p className="text-muted-foreground">
+                  {(appointment.participants || []).join(", ") || "Belum ada peserta diundang."}
+                </p>
+              </div>
+            )}
           </>
         )}
       </SheetContent>

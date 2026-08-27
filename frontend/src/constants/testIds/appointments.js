@@ -8,6 +8,27 @@ export const APPTS = {
   detail: "appointment-detail",
   statusSelect: "appointment-status-select",
   statusApplyBtn: "appointment-status-apply",
+  // Fase 63 — agenda kerja lengkap: tabel (cari/filter/urut) + buat & ubah agenda
+  createBtn: "agenda-create-button",
+  form: "agenda-form",
+  formKind: "agenda-form-kind",
+  formTitle: "agenda-form-title",
+  formType: "agenda-form-type",
+  formDate: "agenda-form-date",
+  formTime: "agenda-form-time",
+  formLead: "agenda-form-lead",
+  formLeadSearch: "agenda-form-lead-search",
+  formLocation: "agenda-form-location",
+  formNotes: "agenda-form-notes",
+  formParticipants: "agenda-form-participants",
+  formParticipant: "agenda-form-participant",
+  formSubmit: "agenda-form-submit",
+  table: "agenda-table",
+  tableRow: "agenda-table-row",
+  tableSearch: "agenda-table-search",
+  rangeFilter: "agenda-range-filter",
+  editBtn: "agenda-edit-button",
+  dayCreateBtn: "agenda-day-create-button",
 };
 
 export const SURVEY = {

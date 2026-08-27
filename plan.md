@@ -147,3 +147,18 @@ Kriteria selesai: `run_all_gates.sh` → **OVERALL PASS (53 gates)**; testing ag
 1. `scripts/mutasi_62.py` — uji ketangguhan gate 53 dengan mutan.
 2. Pengingat WhatsApp otomatis untuk tunggakan (SP1 sesudah H+N lewat toleransi).
 3. Panel riwayat pengiriman dokumen (data `GET /api/docs/share` sudah ada).
+
+---
+
+## 3e) Fase 63 — Agenda & Survey menjadi kalender KERJA (SELESAI, gate 54)
+
+| Fitur | Isi | Bukti |
+|---|---|---|
+| **Tabel agenda** | `AgendaTable.js` (DataTable+FilterBar): cari, filter rentang 7/30 hari & riwayat + golongan/jenis/status, urut & paginasi SERVER, ekspor CSV, filter hidup di URL | gate 54 K5-K7/KUI3-KUI5/D5-D8 |
+| **Buat & ubah agenda** | `AgendaFormDialog.js`: golongan `sales` (lead dicari) vs `internal` (tanpa lead), peserta dari `/appointments/staff`; `PUT /api/appointments/{id}` menolak mengubah agenda `done`/`cancelled` | gate 54 K1-K2/K12/D1-D2/D11-D16 |
+| **Agenda non-penjualan** | `reference_p63.py`: rapat internal, kunjungan proyek, rapat vendor/subkon, lain-lain + grup `agenda_kind` | gate 54 K3-K4/D7 |
+| **Peserta & cakupan** | peserta wajib pengguna nyata; `_appt_scope()` membuat staf yang DIUNDANG melihat agendanya | gate 54 K8-K9/D9-D10/D12 |
+| **RBAC** | `project_manager` & `site_engineer` boleh membuat agenda internal; agenda ber-lead tetap butuh `leads:view`; keuangan tetap hanya baca | gate 54 K10/K14/D3-D4; `verify_panel_resilience` diperbarui (80 PASS) |
+
+Kriteria selesai: `run_all_gates.sh` → **OVERALL PASS (54 gates)**; testing agent iterasi 99
+seluruh alur UI PASS (termasuk responsif 390×844, tanpa overflow).

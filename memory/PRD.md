@@ -26,6 +26,30 @@ Bahasa produk & komunikasi: **Indonesia**.
 - Gate baru `scripts/verify_p61.py` (24 pemeriksaan). Uji UI: iteration_97 (bersih).
 - PDF diperiksa visual (render PNG): kop, rincian, ketentuan, dua kolom tanda tangan OK.
 
+### 27 Jun 2026 (lanjutan) — Fase 63: agenda kerja lengkap (SELESAI, gate 54 hijau)
+- Halaman **Agenda & Survey** dulu hanya kalender + daftar SATU hari (dua pertiga layar kosong,
+  agenda minggu depan hanya bisa ditemukan dengan menebak tanggal). Sekarang: kalender +
+  agenda hari terpilih + **TABEL agenda** (`AgendaTable.js`, pola DataTable+FilterBar) dengan
+  cari, filter (rentang 7/30 hari & riwayat, golongan, jenis, status), urut & paginasi
+  **server-side**, ekspor CSV, dan seluruh filter hidup di URL (`useListQuery`).
+- **Buat/ubah agenda dari halaman ini** (`AgendaFormDialog.js`): golongan `sales` (wajib
+  menyebut lead, dicari bukan digulir) vs `internal` (TANPA lead) + peserta dipilih dari
+  `GET /api/appointments/staff`.
+- Jenis agenda non-penjualan masuk SSOT (`reference_p63.py`): rapat internal, kunjungan
+  proyek, rapat vendor/subkontraktor, lain-lain + grup `agenda_kind`.
+- Backend (`routers/leads_router.py`): `GET /api/appointments` menerima
+  `q/status/type/kind/assigned_to/date_from/date_to/sort/direction`; `POST` menerima
+  `lead_id` OPSIONAL (agenda internal tidak menaikkan tahap lead & tidak menerbitkan tugas
+  survei); `PUT /api/appointments/{id}` (agenda `done`/`cancelled` **tidak bisa diubah**);
+  peserta wajib pengguna nyata; `_appt_scope()` membuat staf yang **diundang** melihat
+  agendanya.
+- RBAC: `project_manager` & `site_engineer` kini boleh melihat/membuat agenda (rapat &
+  kunjungan proyek); agenda yang MENYEBUT LEAD tetap ditolak untuk peran tanpa `leads:view`;
+  keuangan tetap **hanya membaca** (SoD Fase 52 utuh).
+- Gate baru `scripts/verify_p63.py` (44 pemeriksaan) → `run_all_gates.sh` **OVERALL PASS (54
+  gates)**. Uji UI: iteration_99 (semua alur PASS). Perbaikan dari temuan uji: sheet detail
+  tidak lagi menawarkan "Mulai Survey" pada agenda internal; pencarian lead diberi debounce.
+
 ### 27 Jun 2026 (lanjutan) — Fase 62: dokumen penagihan & lapangan (SELESAI, gate 53 hijau)
 - **Surat Peringatan SP1/SP2/SP3** (`warning_letters.py` + `docgen_p62.sp_pdf`): angka & termin
   dari mesin denda (`late_fee_engine` via `arrears_engine.months_in_arrears`), tingkat TIDAK
@@ -84,5 +108,6 @@ Bahasa produk & komunikasi: **Indonesia**.
 ### P2
 - Pengingat WhatsApp untuk pembeli menunggak (kirim SP1 otomatis sesudah H+N lewat toleransi).
 - Riwayat pengiriman dokumen di layar (data `GET /api/docs/share` sudah ada, panelnya belum).
+- Agenda: pengingat WhatsApp H-1 ke peserta, tampilan minggu/bulan, dan ekspor .ics.
 - Peringatan dini tunggakan 1 bulan sebelum batas pembatalan kontrak.
 - Ringkasan direksi: email digest laporan keringanan & utang refund setiap awal bulan.

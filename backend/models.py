@@ -120,12 +120,25 @@ class LeadImport(BaseModel):
 
 
 class AppointmentCreate(BaseModel):
-    lead_id: str
+    # Fase 63: `lead_id` OPSIONAL — rapat internal, kunjungan proyek, dan rapat vendor tidak
+    # punya lead, dan memaksa memilih lead membuat orang menempelkan agenda kerja ke lead
+    # yang tidak bersangkutan (data pipeline jadi bohong).
+    lead_id: Optional[str] = None
     title: str
     scheduled_at: str
     type: ref.AppointmentType = "survey"
     location: Optional[str] = None
     notes: Optional[str] = None
+    participants: Optional[List[str]] = None
+
+
+class AppointmentUpdate(BaseModel):
+    title: Optional[str] = None
+    scheduled_at: Optional[str] = None
+    type: Optional[ref.AppointmentType] = None
+    location: Optional[str] = None
+    notes: Optional[str] = None
+    participants: Optional[List[str]] = None
 
 
 class AppointmentStatus(BaseModel):

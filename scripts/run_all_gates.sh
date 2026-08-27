@@ -93,6 +93,7 @@ GATES=(
   # angkanya dari baris yang sama dengan penagihan, dan yang belum disetujui bertanda DRAFT.
   verify_p61.py
   verify_p62.py
+  verify_p63.py
 )
 
 fail=0

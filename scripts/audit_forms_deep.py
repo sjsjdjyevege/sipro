@@ -49,7 +49,12 @@ FREE_TEXT_HINT = [
     "milestone", "periode", "label", "peralatan", "material",
 ]
 # Pengecualian sah & terverifikasi.
-ALLOW_E1 = {("BoQPage.js", "kode biaya"), ("BoQPage.js", "cost_code")}
+ALLOW_E1 = {("BoQPage.js", "kode biaya"), ("BoQPage.js", "cost_code"),
+            # Fase 63 — "Lead / pembeli" pada AgendaFormDialog BUKAN teks bebas: kotak ini
+            # adalah PENCARIAN relasi (hasilnya dipilih dari daftar, nilai yang tersimpan
+            # selalu `lead_id`). Dropdown sungguhan tidak dipakai karena jumlah lead bisa
+            # ribuan — memuat semuanya ke satu <Select> justru membuat layar tidak terpakai.
+            ("AgendaFormDialog.js", "lead / pembeli")}
 # StatusPill menyimpan peta fallback SECARA SENGAJA: dipakai portal pembeli yang tidak
 # memuat sesi staf (tidak ada akses /api/reference). Didokumentasikan di file itu.
 ALLOW_E5_FILES = {"patterns/StatusPill.js"}

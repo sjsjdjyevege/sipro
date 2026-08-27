@@ -13,7 +13,7 @@ import lead_lifecycle as lc
 from engine import (emit, dispatch_pending, add_activity, auto_assign_lead,
                     compute_lead_score, auto_create_task)
 from models import (LeadCreate, LeadUpdate, LeadStageUpdate, LeadAssign, LeadImport,
-                    AppointmentCreate, AppointmentStatus)
+                    AppointmentCreate, AppointmentStatus, AppointmentUpdate)
 
 router = APIRouter(tags=["sales"])
 
@@ -343,45 +343,129 @@ async def assign_lead(lead_id: str, payload: LeadAssign,
 
 
 # ----------------------------- Appointments -----------------------------
+# Fase 63: kolom yang BOLEH diurutkan server-side (bukan sort di browser atas halaman
+# aktif saja, yang selalu berbohong pada data terpaginasi).
+APPT_SORTS = {"scheduled_at": "scheduled_at", "title": "title", "type": "type",
+              "status": "status", "kind": "kind", "lead_name": "lead_name",
+              "assigned_to": "assigned_to", "created_at": "created_at"}
+APPT_TYPES = list(ref.values("appointment_type"))
+APPT_KINDS = list(ref.values("agenda_kind"))
+
+
+def _appt_scope(user: dict, base: dict) -> dict:
+    """Cakupan baris agenda: sales melihat agendanya sendiri DAN agenda tempat ia diundang.
+
+    Tanpa cabang `participants`, staf yang diundang ke rapat tidak akan pernah melihat
+    rapat itu di kalendernya — undangan yang tidak kelihatan sama saja dengan tidak
+    diundang.
+    """
+    q = scope_query(user, base)
+    if is_scoped_sales(user):
+        own = q.pop("assigned_to", None)
+        if own:
+            invited = {"participants": own}
+            q["$and"] = [*q.get("$and", []), {"$or": [{"assigned_to": own}, invited]}]
+    return q
+
+
 @router.get("/appointments")
-async def list_appointments(lead_id: str = None, status: str = None,
+async def list_appointments(lead_id: str = None, status: str = None, type: str = None,
+                            kind: str = None, assigned_to: str = None, q: str = None,
                             date_from: str = None, date_to: str = None,
+                            sort: str = None, direction: str = None,
                             skip: int = 0, limit: int = 200,
                             user: dict = Depends(require_permission("appointments", "view"))):
+    """Daftar agenda: cari + filter MULTI (koma) + sort server-side + rentang tanggal.
+
+    Fase 63: halaman Agenda & Survey dulu hanya bisa menampilkan agenda SATU HARI yang
+    dipilih di kalender, tanpa cari/filter/urut — sehingga "rapat minggu depan" hanya bisa
+    ditemukan dengan menebak tanggalnya satu per satu.
+    """
     skip, limit = parse_pagination(skip, limit)
     base = {}
     if lead_id:
         base["lead_id"] = lead_id
-    if status:
-        base["status"] = status
+    lst.apply_in(base, "status", status, ref.values("appointment_status"))
+    lst.apply_in(base, "type", type, APPT_TYPES)
+    lst.apply_in(base, "kind", kind, APPT_KINDS)
+    lst.apply_in(base, "assigned_to", assigned_to)
     # Filter rentang tanggal untuk kalender/agenda (scheduled_at disimpan ISO-8601).
-    if date_from or date_to:
-        rng = {}
-        if date_from:
-            rng["$gte"] = date_from
-        if date_to:
-            rng["$lte"] = date_to
-        base["scheduled_at"] = rng
-    query = scope_query(user, base)
+    lst.apply_range(base, "scheduled_at", date_from, date_to)
+    lst.apply_search(base, q, ("title", "lead_name", "location", "notes", "assigned_to"))
+    query = _appt_scope(user, base)
     total = await db.appointments.count_documents(query)
-    rows = await db.appointments.find(query, {"_id": 0}).sort("scheduled_at", 1).skip(skip).limit(limit).to_list(limit)
+    rows = await (db.appointments.find(query, {"_id": 0})
+                  .sort(lst.sort_spec(sort, direction, APPT_SORTS, ("scheduled_at", 1)))
+                  .skip(skip).limit(limit).to_list(limit))
     return {"data": serialize_doc(rows), "total": total}
+
+
+@router.get("/appointments/staff")
+async def appointment_staff(user: dict = Depends(require_permission("appointments", "view"))):
+    """Staf yang bisa diundang sebagai peserta agenda (nama + email + peran).
+
+    Sengaja TIDAK memakai `/admin/users` (hanya owner/super_admin) dan tidak membocorkan
+    apa pun selain yang dibutuhkan pemilih peserta.
+    CATATAN URUTAN RUTE: harus di ATAS `/appointments/{appt_id}`.
+    """
+    org = user.get("org_id", ORG_ID)
+    people = await db.users.find({"org_id": org, "is_active": {"$ne": False}},
+                                 {"_id": 0, "email": 1, "name": 1, "role": 1}
+                                 ).sort("name", 1).to_list(200)
+    return {"data": [{"value": p["email"], "label": p.get("name") or p["email"],
+                      "hint": p.get("role")} for p in people], "total": len(people)}
+
+
+async def _clean_participants(org: str, emails) -> list:
+    """Peserta harus pengguna yang BENAR-BENAR ada; email asing ditolak, bukan disimpan."""
+    wanted = sorted({e.strip().lower() for e in (emails or []) if e and e.strip()})
+    if not wanted:
+        return []
+    found = await db.users.distinct("email", {"org_id": org, "email": {"$in": wanted}})
+    unknown = [e for e in wanted if e not in {str(f).lower() for f in found}]
+    if unknown:
+        raise HTTPException(status_code=400, detail=(
+            f"Peserta tidak dikenal: {', '.join(unknown)}. Pilih dari daftar staf."))
+    return [str(f) for f in found]
 
 
 @router.post("/appointments")
 async def create_appointment(payload: AppointmentCreate,
                              user: dict = Depends(require_permission("appointments", "create"))):
+    """Buat agenda — terkait lead (survei/presentasi) ATAU internal (rapat, kunjungan).
+
+    Aturan yang ditegakkan:
+      * agenda yang MENYEBUT LEAD hanya boleh dibuat pemakai yang berhak melihat lead
+        (`leads:view`), sehingga menjadwalkan survei pembeli tetap milik sales/marketing;
+      * agenda internal TIDAK menyentuh tahap lead dan tidak menerbitkan tugas survei —
+        rapat mingguan bukan bukti kemajuan pipeline;
+      * peserta wajib pengguna yang ada.
+    """
     org = user.get("org_id", ORG_ID)
-    lead = await _get_lead_scoped(payload.lead_id, user)
     ts = now_iso()
+    internal = not payload.lead_id
+    lead = None
+    if not internal:
+        if not await can(user.get("role"), "leads", "view"):
+            raise HTTPException(status_code=403, detail=(
+                "Agenda yang menyebut lead hanya boleh dibuat pemakai yang berhak melihat "
+                "lead. Untuk rapat internal, kosongkan pilihan lead."))
+        lead = await _get_lead_scoped(payload.lead_id, user)
     appt = {
         "id": new_id(), "org_id": org, "lead_id": payload.lead_id, "title": payload.title,
-        "lead_name": lead.get("name"),
-        "scheduled_at": payload.scheduled_at, "type": payload.type, "location": payload.location,
-        "notes": payload.notes, "status": "scheduled", "assigned_to": lead.get("assigned_to"),
+        "lead_name": (lead or {}).get("name"),
+        "kind": "internal" if internal else "sales",
+        "scheduled_at": payload.scheduled_at, "type": payload.type,
+        "location": payload.location,
+        "participants": await _clean_participants(org, payload.participants),
+        "notes": payload.notes, "status": "scheduled",
+        "assigned_to": (lead or {}).get("assigned_to") or user.get("email"),
         "created_by": user.get("email"), "created_at": ts, "updated_at": ts,
     }
     await db.appointments.insert_one(appt)
+    appt.pop("_id", None)
+    if internal:
+        return {"data": serialize_doc(appt)}
     # Tahap naik sebagai AKIBAT aksi (jadwal survey dibuat) + tercatat di riwayat.
     if lead.get("stage") in ("acquisition", "nurturing"):
         await lc.record(lead, "appointment", actor=user.get("email"), source="appointment",
@@ -394,18 +478,54 @@ async def create_appointment(payload: AppointmentCreate,
         sla_due_at=payload.scheduled_at, priority="high", org_id=org)
     await add_activity(entity_type="lead", entity_id=payload.lead_id, type="system",
                        body=f"Appointment dijadwalkan: {payload.title}", actor=user.get("email"), org_id=org)
-    appt.pop("_id", None)
     return {"data": serialize_doc(appt)}
+
+
+async def _get_appt_scoped(appt_id: str, user: dict) -> dict:
+    appt = await db.appointments.find_one(
+        {"id": appt_id, "org_id": user.get("org_id", ORG_ID)}, {"_id": 0})
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment tidak ditemukan")
+    if is_scoped_sales(user) and appt.get("assigned_to") != user.get("email") \
+            and user.get("email") not in (appt.get("participants") or []):
+        raise HTTPException(status_code=403, detail="Akses ditolak")
+    return appt
+
+
+@router.put("/appointments/{appt_id}")
+async def update_appointment(appt_id: str, payload: AppointmentUpdate,
+                             user: dict = Depends(require_permission("appointments", "update"))):
+    """Ubah/geser agenda. Agenda yang sudah SELESAI tidak bisa diubah lagi.
+
+    Jadwal yang sudah dilaksanakan adalah catatan sejarah: mengubahnya sesudahnya membuat
+    berita acara survei & laporan aktivitas bercerita hal yang tidak pernah terjadi.
+    """
+    appt = await _get_appt_scoped(appt_id, user)
+    if appt.get("status") in ("done", "cancelled"):
+        raise HTTPException(status_code=400, detail=(
+            "Agenda yang sudah selesai/dibatalkan tidak bisa diubah — buat agenda baru "
+            "bila jadwalnya diulang."))
+    updates = payload.model_dump(exclude_none=True)
+    if not updates:
+        raise HTTPException(status_code=400, detail="Tidak ada perubahan yang dikirim.")
+    if "participants" in updates:
+        updates["participants"] = await _clean_participants(
+            user.get("org_id", ORG_ID), updates["participants"])
+    updates["updated_at"] = now_iso()
+    await db.appointments.update_one({"id": appt_id}, {"$set": updates})
+    fresh = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
+    if fresh.get("lead_id"):
+        await add_activity(entity_type="lead", entity_id=fresh["lead_id"], type="system",
+                           body=f"Agenda diperbarui: {fresh.get('title')} "
+                                f"({fresh.get('scheduled_at')})",
+                           actor=user.get("email"), org_id=user.get("org_id", ORG_ID))
+    return {"data": serialize_doc(fresh)}
 
 
 @router.post("/appointments/{appt_id}/status")
 async def appointment_status(appt_id: str, payload: AppointmentStatus,
                              user: dict = Depends(require_permission("appointments", "update"))):
-    appt = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
-    if not appt:
-        raise HTTPException(status_code=404, detail="Appointment tidak ditemukan")
-    if is_scoped_sales(user) and appt.get("assigned_to") != user.get("email"):
-        raise HTTPException(status_code=403, detail="Akses ditolak")
+    appt = await _get_appt_scoped(appt_id, user)
     await db.appointments.update_one({"id": appt_id}, {"$set": {"status": payload.status, "updated_at": now_iso()}})
     fresh = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
     return {"data": serialize_doc(fresh)}

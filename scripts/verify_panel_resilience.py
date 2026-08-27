@@ -271,11 +271,22 @@ def audit_server() -> None:
         check(p.status_code == 403, f"{email} TIDAK boleh POST /appointments", str(p.status_code))
     check(bool(lead_id), "ada lead yang bisa dipakai sebagai bahan uji")
 
+    # Fase 63 — peran PROYEK kini boleh melihat & membuat agendanya sendiri (rapat internal,
+    # kunjungan proyek, rapat vendor), karena halaman Agenda tidak lagi hanya berisi janji
+    # temu jual. Yang TIDAK melebar: agenda yang MENYEBUT LEAD tetap ditolak untuk peran
+    # tanpa `leads:view` (dibuktikan di bawah), dan keuangan tetap hanya membaca.
     for email in ("pm@sipro.co.id", "site@sipro.co.id"):
         h = login(email)
         g = requests.get(f"{BASE}/appointments", headers=h, timeout=30)
-        check(g.status_code == 403, f"{email} tetap ditolak di /appointments (izin tidak melebar)",
-              str(g.status_code))
+        check(g.status_code == 200,
+              f"{email} boleh melihat agenda kerjanya (Fase 63)", str(g.status_code))
+        p = requests.post(f"{BASE}/appointments", headers=h,
+                          json={"lead_id": lead_id or "x", "title": "gate44-lead",
+                                "scheduled_at": "2099-01-01T09:00:00Z", "type": "survey"},
+                          timeout=30)
+        check(p.status_code == 403,
+              f"{email} TIDAK boleh menjadwalkan agenda milik LEAD (SoD tetap)",
+              str(p.status_code))
 
     # Dua sebab 403 yang BERBEDA harus tetap bisa dibedakan layar.
     h2 = login("sales2@sipro.co.id")
