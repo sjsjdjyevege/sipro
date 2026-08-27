@@ -127,4 +127,16 @@ export const NOTIF = {
   page: "notifications-page",
   item: "notification-item",
   markAll: "notif-mark-all-button",
+  // Fase 64 — pusat notifikasi: keadaan (perlu tindakan / belum dibaca / sudah dilihat),
+  // kategori, navigasi ke pekerjaannya, dan pembersihan supaya daftar tidak menumpuk.
+  stateTab: "notif-state-tab",
+  categoryChip: "notif-category-chip",
+  search: "notif-search",
+  openBtn: "notif-open-button",
+  dismissBtn: "notif-dismiss-button",
+  clearReadBtn: "notif-clear-read-button",
+  actionBadge: "notif-action-badge",
+  resolvedNote: "notif-resolved-note",
+  summary: "notif-summary",
+  empty: "notif-empty",
 };

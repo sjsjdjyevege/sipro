@@ -26,6 +26,29 @@ Bahasa produk & komunikasi: **Indonesia**.
 - Gate baru `scripts/verify_p61.py` (24 pemeriksaan). Uji UI: iteration_97 (bersih).
 - PDF diperiksa visual (render PNG): kop, rincian, ketentuan, dua kolom tanda tangan OK.
 
+### 27 Jun 2026 (lanjutan) — Fase 64: pusat notifikasi yang bisa habis (SELESAI, gate 55)
+- Keluhan pemakai: kartu notifikasi besar, daftar memanjang tanpa akhir, tanpa kategori,
+  tanpa jalan ke pekerjaannya, dan notifikasi tetap berdiri walau tindakannya sudah selesai.
+- **Baris padat** (`components/notifications/NotificationRows.js`): satu notifikasi = satu
+  baris (~52px) dengan ikon kategori, judul, isi terpangkas, waktu, tombol buka/tandai/
+  sembunyikan; penanda **PERLU TINDAKAN** dan **sudah ditangani**.
+- **Kategori & keadaan** (`backend/notif_center.py`): kategori (tugas, keuangan, penjualan,
+  proyek, layanan, sebutan, sistem) & penanda `needs_action` **diturunkan dari data yang
+  sudah ada** (`type` + `related_entity_type`) sehingga ~300 notifikasi lama ikut
+  berkategori tanpa migrasi. Tab keadaan: Perlu tindakan · Belum dibaca · Sudah dilihat ·
+  Semua (label dari SSOT `reference_p64.notification_state`).
+- **Navigasi**: `link_of()` — SATU peta entitas/jenis → rute; notifikasi tugas selalu ke
+  papan tugas (`TYPE_LINK_WINS`).
+- **Auto-cabut**: `resolve_done()` mencabut notifikasi yang tindakannya sudah dilakukan
+  (tugas ditutup, kas bon/PO/termin/klaim diputus, tagihan dibayar, temuan selesai, fee
+  diputus, entitas hilang) — ditandai `resolved_at` + alasan, TIDAK dihapus.
+- **Endpoint**: `GET /api/notifications?state=&category=&q=` (kirim `summary` + `auto_resolved`),
+  `POST /notifications/{id}/dismiss`, `POST /notifications/clear-read`,
+  `POST /notifications/read-all?category=`; kontrak lama `unread_only` (lonceng TopBar) utuh.
+- Gate baru `scripts/verify_p64.py` (45 pemeriksaan) → **OVERALL PASS (55 gates)**. Uji:
+  iteration_100 (12/12 pytest + UI 1440×900 & 390×844, 0 isu) — berkas uji
+  `backend/tests/test_notif_p64.py` men-snapshot & memulihkan data.
+
 ### 27 Jun 2026 (lanjutan) — Fase 63: agenda kerja lengkap (SELESAI, gate 54 hijau)
 - Halaman **Agenda & Survey** dulu hanya kalender + daftar SATU hari (dua pertiga layar kosong,
   agenda minggu depan hanya bisa ditemukan dengan menebak tanggal). Sekarang: kalender +
@@ -109,5 +132,7 @@ Bahasa produk & komunikasi: **Indonesia**.
 - Pengingat WhatsApp untuk pembeli menunggak (kirim SP1 otomatis sesudah H+N lewat toleransi).
 - Riwayat pengiriman dokumen di layar (data `GET /api/docs/share` sudah ada, panelnya belum).
 - Agenda: pengingat WhatsApp H-1 ke peserta, tampilan minggu/bulan, dan ekspor .ics.
+- Notifikasi: pengelompokan notifikasi kembar ("5× Persetujuan diskon penawaran") dan
+  preferensi per pemakai (kategori mana yang boleh mengirim push).
 - Peringatan dini tunggakan 1 bulan sebelum batas pembatalan kontrak.
 - Ringkasan direksi: email digest laporan keringanan & utang refund setiap awal bulan.

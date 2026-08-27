@@ -162,3 +162,23 @@ Kriteria selesai: `run_all_gates.sh` → **OVERALL PASS (53 gates)**; testing ag
 
 Kriteria selesai: `run_all_gates.sh` → **OVERALL PASS (54 gates)**; testing agent iterasi 99
 seluruh alur UI PASS (termasuk responsif 390×844, tanpa overflow).
+
+---
+
+## 3f) Fase 64 — pusat notifikasi yang BISA HABIS (SELESAI, gate 55)
+
+| Keluhan pemakai | Perbaikan | Bukti |
+|---|---|---|
+| Kartu besar, daftar memanjang | baris padat ~52px (`NotificationRows.js`), isi dipangkas satu baris | gate 55 KUI1-KUI2; uji UI iterasi 100 |
+| Overwhelming, tanpa kategori | 4 tab keadaan berjumlah + chip kategori berjumlah (kategori DITURUNKAN dari `type`+`related_entity_type`, tanpa migrasi) | gate 55 K1/KUI3-KUI4/D2-D4 |
+| Notifikasi tidak hilang walau sudah ditindak | `resolve_done()` + `_resolve_task_notifs()` mencabut sendiri (tandai `resolved_at`+alasan, tidak dihapus) | gate 55 K5-K8/D10-D13 |
+| Tidak membantu navigasi | `link_of()` satu peta; notifikasi tugas selalu ke papan tugas | gate 55 K3-K4/D5 |
+| Yang sudah dilihat menumpuk | tab "Sudah dilihat", tombol sembunyikan per baris, "Bersihkan yang sudah dilihat" | gate 55 K9/KUI7/D14-D19 |
+
+Kriteria selesai: `run_all_gates.sh` → **OVERALL PASS (55 gates)**; iterasi 100: 12/12 pytest
+(`backend/tests/test_notif_p64.py`, snapshot→ubah→pulihkan) + UI 1440×900 & 390×844, 0 isu.
+
+## 6) Tugas berikutnya (sesudah Fase 64)
+1. Pengelompokan notifikasi kembar ("5× Persetujuan diskon penawaran").
+2. Preferensi notifikasi per pemakai (kategori mana yang boleh mengirim push/WA).
+3. `scripts/mutasi_62.py` & `mutasi_63.py` (uji mutan gate 53/54).

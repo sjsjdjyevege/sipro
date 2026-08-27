@@ -94,6 +94,7 @@ GATES=(
   verify_p61.py
   verify_p62.py
   verify_p63.py
+  verify_p64.py
 )
 
 fail=0
